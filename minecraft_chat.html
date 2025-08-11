@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Minecraft AI 聊天</title>
+    <style>
+      /* 全局样式 */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: "Minecraft", "Courier New", monospace;
+      }
+
+      @font-face {
+        font-family: "Minecraft";
+        src: url("https://fonts.cdnfonts.com/css/minecraft-3") format("woff2");
+        font-weight: normal;
+        font-style: normal;
+      }
+
+      body {
+        background-color: #8b4513;
+        background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16" fill="%238B4513"/><rect width="8" height="8" fill="%23A0522D"/><rect x="8" y="8" width="8" height="8" fill="%23A0522D"/></svg>');
+        color: #f5f5dc;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      /* 标题栏 */
+      .header {
+        background-color: #2e8b57;
+        border-bottom: 4px solid #000;
+        padding: 12px;
+        text-align: center;
+        box-shadow: 0 4px 0 rgba(0, 0, 0, 0.3);
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .model-selector {
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      #model-select {
+        padding: 4px 8px;
+        background-color: #f5f5dc;
+        border: 2px solid #000;
+        border-radius: 4px;
+        color: #000;
+        font-family: "Minecraft", "Courier New", monospace;
+      }
+
+      .header h1 {
+        text-shadow: 3px 3px 0 #000;
+        font-size: 24px;
+        letter-spacing: 1px;
+      }
+
+      /* 聊天容器 */
+      .chat-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 16px;
+        overflow: hidden;
+      }
+
+      /* 聊天消息区域 */
+      .chat-messages {
+        flex: 1;
+        background-color: rgba(0, 0, 0, 0.5);
+        border: 4px solid #000;
+        border-radius: 8px;
+        padding: 16px;
+        overflow-y: auto;
+        margin-bottom: 16px;
+        box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+      }
+
+      .message {
+        margin-bottom: 16px;
+        padding: 12px;
+        border-radius: 4px;
+        max-width: 85%;
+        word-break: break-word;
+      }
+
+      .user-message {
+        background-color: #006400;
+        border: 2px solid #000;
+        margin-left: auto;
+        box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.3);
+      }
+
+      .ai-message {
+        background-color: #4b0082;
+        border: 2px solid #000;
+        box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.3);
+      }
+
+      .message-content {
+        font-size: 16px;
+        line-height: 1.5;
+      }
+
+      .thinking {
+        color: #a9a9a9;
+        font-size: 12px;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px dashed #666;
+      }
+
+      /* 代码块样式 */
+      .code-block {
+        background-color: #1e1e1e;
+        border: 2px solid #000;
+        border-radius: 4px;
+        padding: 12px;
+        margin: 8px 0;
+        overflow-x: auto;
+        font-family: "Courier New", monospace;
+        font-size: 14px;
+        line-height: 1.5;
+        color: #d4d4d4;
+        box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.5);
+      }
+
+      .code-header {
+        background-color: #333;
+        padding: 4px 8px;
+        border-bottom: 2px solid #000;
+        font-size: 12px;
+        color: #aaa;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .code-content {
+        padding: 8px;
+        white-space: pre-wrap;
+      }
+
+      /* 代码高亮样式 */
+      .keyword {
+        color: #569cd6;
+        display: inline;
+      }
+      .string {
+        color: #ce9178;
+        display: inline;
+      }
+      .comment {
+        color: #6a9955;
+        display: inline;
+      }
+      .number {
+        color: #b5cea8;
+      }
+      .function {
+        color: #dcdcaa;
+      }
+
+      /* 输入区域 */
+      .input-area {
+        display: flex;
+        gap: 8px;
+      }
+
+      .message-input {
+        flex: 1;
+        padding: 12px;
+        border: 4px solid #000;
+        border-radius: 4px;
+        background-color: #f5f5dc;
+        color: #000;
+        font-size: 16px;
+        box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.3);
+        resize: none;
+        height: 80px;
+      }
+
+      .send-button {
+        padding: 12px 24px;
+        background-color: #2e8b57;
+        color: #f5f5dc;
+        border: 4px solid #000;
+        border-radius: 4px;
+        font-size: 16px;
+        cursor: pointer;
+        box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.3);
+        transition: all 0.1s;
+      }
+
+      .send-button:hover {
+        background-color: #3cb371;
+      }
+
+      .send-button:active {
+        box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.3);
+        transform: translate(2px, 2px);
+      }
+
+      /* 状态指示器 */
+      .status {
+        text-align: center;
+        padding: 8px;
+        font-size: 14px;
+        color: #f5f5dc;
+      }
+
+      /* 滚动条样式 */
+      ::-webkit-scrollbar {
+        width: 16px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: #555;
+        border-left: 2px solid #000;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background: #888;
+        border: 2px solid #000;
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background: #aaa;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>Minecraft AI 聊天</h1>
+      <div class="model-selector">
+        <label for="model-select">选择模型:</label>
+        <select id="model-select">
+          <!-- 模型选项将通过JavaScript动态加载 -->
+          <option value="">加载中...</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="chat-container">
+      <div class="chat-messages" id="chat-messages">
+        <!-- 消息会在这里动态添加 -->
+        <div class="ai-message message">
+          <div class="message-content">
+            你好！我是基于 LM Studio 的 Minecraft
+            风格聊天助手。有什么我可以帮助你的吗？
+          </div>
+        </div>
+      </div>
+
+      <div class="input-area">
+        <textarea
+          class="message-input"
+          id="message-input"
+          placeholder="输入消息..."
+        ></textarea>
+        <button class="send-button" id="send-button">发送</button>
+      </div>
+    </div>
+
+    <div class="status" id="status">就绪</div>
+
+    <script>
+      // DOM 元素
+      const chatMessages = document.getElementById("chat-messages");
+      const messageInput = document.getElementById("message-input");
+      const sendButton = document.getElementById("send-button");
+      const status = document.getElementById("status");
+
+      // 格式化代码块
+      function formatCodeBlocks(content) {
+        // 匹配代码块 (```语言
+        // 代码内容
+        // ```)
+        const codeBlockRegex = /```([a-zA-Z0-9]*)\n([\s\S]*?)```/g;
+        return content.replace(codeBlockRegex, (match, language, code) => {
+          // 简单的语法高亮
+          code = highlightCode(code, language);
+          return `<div class="code-block">
+                    <div class="code-header">
+                        <span>${language || "代码"}</span>
+                        <button class="copy-button" onclick="copyCode(this)">复制</button>
+                    </div>
+                    <div class="code-content">${code}</div>
+                </div>`;
+        });
+      }
+
+      // 简单的代码高亮
+      function highlightCode(code, language) {
+        // 对不同语言使用不同的高亮规则
+        if (language === "javascript" || language === "js") {
+          // JavaScript 高亮
+          code = code
+            // 关键字
+            .replace(
+              /\b(function|return|if|else|for|while|const|let|var|class|extends|super|this|export|import|from)\b/g,
+              '<span class="keyword">$1</span>'
+            )
+            // 字符串
+            .replace(/'(.*?)'/g, "<span class=\"string\">'$1'</span>")
+            .replace(/"(.*?)"/g, '<span class="string">"$1"</span>')
+            // 注释
+            .replace(/\/\/.*$/gm, '<span class="comment">$&</span>')
+            .replace(/\/\*[\s\S]*?\*\//g, '<span class="comment">$&</span>')
+            // 数字
+            .replace(/\b\d+\b/g, '<span class="number">$&</span>')
+            // 函数名
+            .replace(
+              /function\s+(\w+)/g,
+              'function <span class="function">$1</span>'
+            );
+        } else if (language === "python" || language === "py") {
+          // Python 高亮
+          code = code
+            // 关键字
+            .replace(
+              /\b(def|return|if|else|elif|for|while|import|from|class|self|super|try|except|finally|with|as)\b/g,
+              '<span class="keyword">$1</span>'
+            )
+            // 字符串
+            .replace(/'(.*?)'/g, "<span class=\"string\">'$1'</span>")
+            .replace(/"(.*?)"/g, '<span class="string">"$1"</span>')
+            // 注释
+            .replace(/\#.*$/gm, '<span class="comment">$&</span>')
+            // 数字
+            .replace(/\b\d+\b/g, '<span class="number">$&</span>')
+            // 函数名
+            .replace(/def\s+(\w+)/g, 'def <span class="function">$1</span>');
+        } else if (language === "html") {
+          // HTML 高亮 - 修复嵌套span问题
+          let tempCode = code;
+
+          // 先处理注释
+          tempCode = tempCode.replace(
+            /<!--[\s\S]*?-->/g,
+            '<span class="comment">$&</span>'
+          );
+
+          // 再处理属性值
+          tempCode = tempCode
+            .replace(/(\w+)="([^"]*)"/g, '$1=<span class="string">"$2"</span>')
+            .replace(
+              /(\w+)=\'([^\']*)\'/g,
+              "$1=<span class=\"string\">'$2'</span>"
+            );
+
+          // 最后处理标签（排除已处理的span标签）
+          tempCode = tempCode.replace(
+            /<(\/?)([a-zA-Z][a-zA-Z0-9:\-]*)(?![^>]*class="(keyword|string|comment)")([^>]*?)>/g,
+            '<span class="keyword">&lt;$1$2$4&gt;</span>'
+          );
+
+          code = tempCode;
+        } else if (language === "css") {
+          // CSS 高亮
+          code = code
+            // 选择器
+            .replace(
+              /(^|\s)([^{]+)(?=\{)/gm,
+              '$1<span class="function">$2</span>'
+            )
+            // 属性
+            .replace(/(\w+):/g, '<span class="keyword">$1</span>:')
+            // 值
+            .replace(/:([^;}]+)/g, ':<span class="string">$1</span>')
+            // 注释
+            .replace(/\/\*[\s\S]*?\*\//g, '<span class="comment">$&</span>');
+        }
+        return code;
+      }
+
+      // 复制代码到剪贴板
+      function copyCode(button) {
+        const codeBlock = button.closest(".code-block");
+        const codeContent =
+          codeBlock.querySelector(".code-content").textContent;
+        navigator.clipboard.writeText(codeContent).then(() => {
+          const originalText = button.textContent;
+          button.textContent = "已复制!";
+          setTimeout(() => {
+            button.textContent = originalText;
+          }, 2000);
+        });
+      }
+
+      // LM Studio 配置
+      const LM_STUDIO_API_URL = "http://110.40.39.137:2459/v1/chat/completions";
+      const LM_STUDIO_MODELS_URL = "http://110.40.39.137:2459/v1/models";
+      let currentModel = ""; // 当前选择的模型
+
+      // 从LM Studio获取模型列表
+      async function fetchModels() {
+        try {
+          const response = await fetch(LM_STUDIO_MODELS_URL);
+          if (!response.ok) {
+            throw new Error(`获取模型列表失败: ${response.status}`);
+          }
+          const models = await response.json();
+          return models.data;
+        } catch (error) {
+          console.error("获取模型列表错误:", error);
+          status.textContent = "获取模型列表失败";
+          return [];
+        }
+      }
+
+      // 初始化模型选择器
+      async function initModelSelector() {
+        const modelSelect = document.getElementById("model-select");
+        // 清空现有选项
+        modelSelect.innerHTML = "";
+
+        // 获取模型列表
+        const models = await fetchModels();
+
+        if (models.length === 0) {
+          // 如果没有获取到模型，添加一个默认选项
+          const defaultOption = document.createElement("option");
+          defaultOption.value =
+            "lmstudio-community/Meta-Llama-3-8B-Instruct-GGUF";
+          defaultOption.textContent = "默认模型 (未连接到LM Studio)";
+          modelSelect.appendChild(defaultOption);
+          currentModel = defaultOption.value;
+        } else {
+          // 添加模型选项
+          models.forEach((model) => {
+            const option = document.createElement("option");
+            option.value = model.id;
+            option.textContent = model.id;
+            modelSelect.appendChild(option);
+          });
+          // 设置第一个模型为默认值
+          currentModel = models[0].id;
+          modelSelect.value = currentModel;
+        }
+
+        // 模型选择器事件监听
+        modelSelect.addEventListener("change", () => {
+          currentModel = modelSelect.value;
+          status.textContent = `已切换到模型: ${currentModel}`;
+          // 测试新模型连接
+          testLMStudioConnection();
+        });
+
+        return currentModel;
+      }
+
+      // 添加消息到聊天区域
+      function addMessage(content, isUser = false, thinking = "") {
+        const messageDiv = document.createElement("div");
+        messageDiv.className = isUser
+          ? "user-message message"
+          : "ai-message message";
+
+        // 处理代码块和换行符
+        content = formatCodeBlocks(content);
+        content = content.replace(/\n/g, "<br>");
+        thinking = thinking.replace(/\n/g, "<br>");
+
+        let messageHTML = `<div class="message-content">${content}</div>`;
+
+        // 如果有思考内容，添加到消息中
+        if (thinking) {
+          messageHTML += `<div class="thinking">${thinking}</div>`;
+        }
+
+        messageDiv.innerHTML = messageHTML;
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+
+      // 发送消息到 LM Studio
+      async function sendMessageToLMStudio(message) {
+        try {
+          status.textContent = "正在思考...";
+          sendButton.disabled = true;
+
+          // 添加用户消息
+          addMessage(message, true);
+
+          // 发送请求到 LM Studio
+          const response = await fetch(LM_STUDIO_API_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: currentModel,
+              messages: [
+                {
+                  role: "user",
+                  content: message,
+                },
+              ],
+              stream: true,
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP 错误! 状态码: ${response.status}`);
+          }
+
+          // 处理流式响应
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let aiResponse = "";
+          let thinkingContent = "";
+
+          // 创建AI消息的占位符
+          const placeholderDiv = document.createElement("div");
+          placeholderDiv.className = "ai-message message";
+          placeholderDiv.innerHTML = `<div class="message-content">正在生成...</div>`;
+          chatMessages.appendChild(placeholderDiv);
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split("\n");
+
+            for (const line of lines) {
+              if (line.startsWith("data: ") && line !== "data: [DONE]") {
+                try {
+                  const data = JSON.parse(line.slice(5));
+
+                  // 检查是否有思考内容
+                  if (data.choices[0].delta?.thinking) {
+                    thinkingContent += data.choices[0].delta.thinking;
+                  }
+
+                  // 检查是否有回复内容
+                  if (data.choices[0].delta?.content) {
+                    aiResponse += data.choices[0].delta.content;
+
+                    // 更新占位符内容
+                    placeholderDiv.innerHTML = `
+                                        <div class="message-content">${aiResponse.replace(
+                                          /\n/g,
+                                          "<br>"
+                                        )}</div>
+                                        ${
+                                          thinkingContent
+                                            ? `<div class="thinking">${thinkingContent.replace(
+                                                /\n/g,
+                                                "<br>"
+                                              )}</div>`
+                                            : ""
+                                        }
+                                    `;
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                  }
+                } catch (e) {
+                  console.error("解析JSON错误:", e);
+                }
+              }
+            }
+          }
+
+          // 替换占位符为最终消息
+          placeholderDiv.remove();
+          addMessage(aiResponse, false, thinkingContent);
+        } catch (error) {
+          console.error("发送消息错误:", error);
+          addMessage(`抱歉，发生错误: ${error.message}`, false);
+        } finally {
+          status.textContent = "就绪";
+          sendButton.disabled = false;
+          messageInput.value = "";
+        }
+      }
+
+      // 绑定发送按钮事件
+      sendButton.addEventListener("click", () => {
+        const message = messageInput.value.trim();
+        if (message) {
+          sendMessageToLMStudio(message);
+        }
+      });
+
+      // 绑定回车键事件（Shift+Enter换行，Enter发送）
+      messageInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          const message = messageInput.value.trim();
+          if (message) {
+            sendMessageToLMStudio(message);
+          }
+        }
+      });
+
+      // 测试LM Studio连接
+      async function testLMStudioConnection() {
+        try {
+          const response = await fetch(LM_STUDIO_API_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: MODEL_NAME,
+              messages: [
+                {
+                  role: "user",
+                  content: "测试连接",
+                },
+              ],
+              max_tokens: 1,
+            }),
+          });
+
+          if (!response.ok) {
+            status.textContent = "未连接到LM Studio";
+            addMessage(
+              "未检测到LM Studio运行。请确保LM Studio已启动并启用了API服务。",
+              false
+            );
+          } else {
+            status.textContent = "已连接到LM Studio";
+          }
+        } catch (error) {
+          status.textContent = "未连接到LM Studio";
+          addMessage(
+            "未检测到LM Studio运行。请确保LM Studio已启动并启用了API服务。",
+            false
+          );
+        }
+      }
+
+      // 页面加载完成后初始化模型选择器并测试连接
+      window.addEventListener("load", async () => {
+        await initModelSelector();
+        testLMStudioConnection();
+      });
+    </script>
+  </body>
+</html>
